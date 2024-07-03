@@ -1,46 +1,56 @@
-import { createClient } from "redis";
+import Redis from "redis";
 
 class RedisClient {
   constructor() {
-    this.client = createClient();
+    this.client = Redis.createClient();
 
+    // Error handling
     this.client.on("error", (err) => {
-      console.error("Redis Client Error:", err);
+      console.error("Redis connection error:", err);
     });
-
-    this.client.connect().catch(console.error);
   }
 
   isAlive() {
-    return this.client.isOpen;
+    return this.client.connected;
   }
 
   async get(key) {
-    try {
-      const value = await this.client.get(key);
-      return value;
-    } catch (err) {
-      console.error("Error getting key from Redis:", err);
-      return null;
-    }
+    return new Promise((resolve, reject) => {
+      this.client.get(key, (err, reply) => {
+        if (err) {
+          console.error("Error while getting from Redis:", err);
+          reject(err);
+        } else {
+          resolve(reply ? JSON.parse(reply) : null);
+        }
+      });
+    });
   }
 
-  async set(key, value, duration) {
-    try {
-      await this.client.set(key, value, {
-        EX: duration,
+  async set(key, value, durationSeconds) {
+    return new Promise((resolve, reject) => {
+      this.client.setex(key, durationSeconds, JSON.stringify(value), (err) => {
+        if (err) {
+          console.error("Error while setting in Redis:", err);
+          reject(err);
+        } else {
+          resolve();
+        }
       });
-    } catch (err) {
-      console.error("Error setting key in Redis:", err);
-    }
+    });
   }
 
   async del(key) {
-    try {
-      await this.client.del(key);
-    } catch (err) {
-      console.error("Error deleting key from Redis:", err);
-    }
+    return new Promise((resolve, reject) => {
+      this.client.del(key, (err, reply) => {
+        if (err) {
+          console.error("Error while deleting from Redis:", err);
+          reject(err);
+        } else {
+          resolve(reply);
+        }
+      });
+    });
   }
 }
 
